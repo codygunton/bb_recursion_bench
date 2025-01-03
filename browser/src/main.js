@@ -1,11 +1,12 @@
-import { BarretenbergBackend } from '@noir-lang/backend_barretenberg';
+import { UltraPlonkBackend } from "@aztec/bb.js";
 import { Noir } from '@noir-lang/noir_js';
-// compiled circuits
 import main from "../../main/target/main.json";
 import recursion from "../../recursion/target/recursion.json";
 
 document.getElementById('bbProveMulti').addEventListener('click', async () => {
-  prove(navigator.hardwareConcurrency);
+  // Currently if you pass a non-power of 2 number of threads, you only get as many as the nearest smaller power of two
+  // We expect this to be easy to fix.
+  prove(1 << Math.log2(navigator.hardwareConcurrency));
 });
 
 document.getElementById('bbProveSingle').addEventListener('click', async () => {
@@ -15,7 +16,7 @@ document.getElementById('bbProveSingle').addEventListener('click', async () => {
 const prove = async (threads) => {
   console.log(`Running with ${threads} threads`);
   try {
-    var backend = new BarretenbergBackend(main, { threads });
+    var backend = new UltraPlonkBackend(main.bytecode, { threads },  {recursive: true});
     var noir = new Noir(main);
     const baseInput = {
       "x": 1,
@@ -46,7 +47,7 @@ const prove = async (threads) => {
     );
 
     // generate the recursion proof
-    backend = new BarretenbergBackend(recursion, { threads });
+    backend = new UltraPlonkBackend(recursion.bytecode, { threads: threads }, {recursive: false});
     noir = new Noir(recursion);
     const { publicInputs } = baseProof;
     const { vkAsFields, proofAsFields, vkHash } = proofArtifacts;
@@ -59,6 +60,11 @@ const prove = async (threads) => {
 
     console.log('Generating recursion witness... ⌛');
     startTime = performance.now();
+    // console.log(`recursion input: ${recursionInput}`);
+    // console.log(`               : ${recursionInput.verification_key}`);
+    // console.log(`               : ${recursionInput.proof}`);
+    // console.log(`               : ${recursionInput.public_inputs}`);
+    // console.log(`               : ${recursionInput.key_hash}`);
     var { witness } = await noir.execute(recursionInput);
     endTime = performance.now();
     console.log(`Witness generation took ${endTime - startTime} ms`);
